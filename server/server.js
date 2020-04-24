@@ -5,12 +5,14 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+const MessagingResponse = require("twilio").twiml.MessagingResponse;
 
 const User = require("./mongodb-scheme");
 
 const app = express();
 
 app.use(bodyParser());
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 function createAuthToken(id) {
@@ -78,6 +80,34 @@ app.post("/user/signin", (req, res) => {
       res.redirect("http://localhost:3000/");
     } else {
       return res.send("Bad Username or Password");
+    }
+  });
+});
+
+app.post("/sms", (req, res) => {
+  const twiml = new MessagingResponse();
+  User.findOne({ phone: req.body.From }, (err, user) => {
+    if (err) {
+      twiml.message("There was an unexpected error. Please try again");
+
+      res.writeHead(200, { "Content-Type": "text/xml" });
+      res.end(twiml.toString());
+    }
+    if (!user) {
+      twiml.message(
+        "No user registered for this phone number. Please signup at moodstate.co"
+      );
+
+      res.writeHead(200, { "Content-Type": "text/xml" });
+      res.end(twiml.toString());
+    } else {
+      var today = new Date();
+      today = today.now();
+      user.update({ $push: { mood: { name: req.body.Body, date: today } } });
+
+      twiml.message("Successfully added mood.");
+      res.writeHead(200, { "Content-Type": "text/xml" });
+      res.end(twiml.toString());
     }
   });
 });
