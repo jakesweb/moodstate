@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
+const cors = require("cors");
 const bcrypt = require("bcrypt");
 const MessagingResponse = require("twilio").twiml.MessagingResponse;
 
@@ -11,9 +12,15 @@ const User = require("./mongodb-scheme");
 
 const app = express();
 
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
+app.use(cookieParser());
 app.use(bodyParser());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
 
 function createAuthToken(id) {
   var sign = process.env.JWT_SECRET;
@@ -56,12 +63,13 @@ app.post("/user/signup", (req, res) => {
           password: hash,
           phone: req.body.phone,
         });
+
         user.save((err) => {
           if (err) return res.send(err);
+
           var token = createAuthToken(req.body.email);
-          var newDate = new Date();
-          var expDate = newDate.setMonth(newDate.getMonth() + 3);
-          res.cookie("id", token, { sameSite: "lax", maxAge: expDate });
+
+          res.cookie("id", token, { sameSite: "lax", maxAge: 86400 });
           res.redirect("http://localhost:3000/");
         });
       });
@@ -72,11 +80,12 @@ app.post("/user/signup", (req, res) => {
 app.post("/user/signin", (req, res) => {
   User.findOne({ email: req.body.email }, (err, user) => {
     if (err) return res.send(err);
+    if (!user) return res.send("Bad Username or Password");
+
     if (bcrypt.compare(req.body.password, user.password)) {
       var token = createAuthToken(req.body.email);
-      var newDate = new Date();
-      var expDate = newDate.setMonth(newDate.getMonth() + 3);
-      res.cookie("id", token, { sameSite: "lax", maxAge: expDate });
+
+      res.cookie("id", token, { sameSite: "lax", maxAge: 86400 });
       res.redirect("http://localhost:3000/");
     } else {
       return res.send("Bad Username or Password");
@@ -94,6 +103,7 @@ app.post("/sms", (req, res) => {
       res.end(twiml.toString());
     }
     if (!user) {
+      console.log(req.body);
       twiml.message(
         "No user registered for this phone number. Please signup at moodstate.co"
       );
@@ -102,8 +112,14 @@ app.post("/sms", (req, res) => {
       res.end(twiml.toString());
     } else {
       var today = new Date();
-      today = today.now();
-      user.update({ $push: { mood: { name: req.body.Body, date: today } } });
+
+      User.update(
+        { email: user.email },
+        { $push: { mood: { name: req.body.Body, date: today } } },
+        (err) => {
+          if (err) res.send(err);
+        }
+      );
 
       twiml.message("Successfully added mood.");
       res.writeHead(200, { "Content-Type": "text/xml" });
@@ -114,6 +130,22 @@ app.post("/sms", (req, res) => {
 
 app.get("/secret", authenticateRoute, (req, res) => {
   res.send("You found it");
+});
+
+app.get("/user/data", authenticateRoute, (req, res) => {
+  var token = req.cookies["id"];
+  var decoded = jwt.decode(token);
+
+  if (decoded.user) {
+    User.findOne({ email: decoded.user }, (err, user) => {
+      if (err) return res.send(err);
+      var mood = user.mood;
+
+      res.json(mood);
+    });
+  } else {
+    return res.send("User not found");
+  }
 });
 
 app.listen(3001);
