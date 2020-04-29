@@ -10,10 +10,19 @@ function App() {
   return (
     <>
       <div>
-        <header>
-          <Link to="/signup">Signup</Link>
-          <Link to="/signin">Signin</Link>
-          <Link to="/userdata">User Data</Link>
+        <header class="app-header">
+          <Link to="/" class="app-title">
+            MoodState
+          </Link>
+          <Link to="/signup" class="app-link">
+            Signup
+          </Link>
+          <Link to="/signin" class="app-link">
+            Signin
+          </Link>
+          <Link to="/userdata" class="app-link">
+            User Data
+          </Link>
         </header>
       </div>
       <Route path="/signup" component={Signup} />

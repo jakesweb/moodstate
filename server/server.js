@@ -57,11 +57,17 @@ app.post("/user/signup", (req, res) => {
       return res.send("User Already Created");
     } else {
       bcrypt.hash(req.body.password, 10).then(function (hash) {
+        var phone = req.body.phone;
+
+        if (phone.slice(0, 1) !== "+") {
+          phone = "+" + phone;
+        }
+
         const user = new User({
           email: req.body.email,
           name: req.body.name,
           password: hash,
-          phone: req.body.phone,
+          phone: phone,
         });
 
         user.save((err) => {
@@ -69,7 +75,7 @@ app.post("/user/signup", (req, res) => {
 
           var token = createAuthToken(req.body.email);
 
-          res.cookie("id", token, { sameSite: "lax", maxAge: 86400 });
+          res.cookie("id", token, { sameSite: "lax" });
           res.redirect("http://localhost:3000/");
         });
       });
@@ -85,7 +91,7 @@ app.post("/user/signin", (req, res) => {
     if (bcrypt.compare(req.body.password, user.password)) {
       var token = createAuthToken(req.body.email);
 
-      res.cookie("id", token, { sameSite: "lax", maxAge: 86400 });
+      res.cookie("id", token, { sameSite: "lax" });
       res.redirect("http://localhost:3000/");
     } else {
       return res.send("Bad Username or Password");
@@ -144,7 +150,8 @@ app.get("/user/data", authenticateRoute, (req, res) => {
       res.json(mood);
     });
   } else {
-    return res.send("User not found");
+    res.send("User not found");
+    res.redirect("http://localhost:3000/signin");
   }
 });
 
